@@ -40,7 +40,7 @@ function Perf( runner ){
   });
 
   runner.on( 'test', function( test ){
-    console.log('.');
+    process.stdout.write('.');
     this_.stats[ test.parent.title ][ test.title ] = {};
     test.start = new Date();
   });
