@@ -23,9 +23,13 @@ var colWidths = [
 ];
 
 function Perf( runner ){
+  if (!runner){
+    return;
+  }
   var this_ = this;
 
   this.stats = {};
+  this.metrics = [];
 
   runner.on( 'start', function(){
     console.log();
@@ -36,7 +40,7 @@ function Perf( runner ){
   });
 
   runner.on( 'test', function( test ){
-    process.stdout.write('.');
+    console.log('.');
     this_.stats[ test.parent.title ][ test.title ] = {};
     test.start = new Date();
   });
@@ -50,19 +54,27 @@ function Perf( runner ){
 
   });
 
+  runner.on( 'pending', function( test ){
+
+  });
+
   runner.on( 'fail', function( test, error ){
+    console.log(error);
     this_.stats[ test.parent.title ][ test.title ].error = error;
   });
 
   runner.on( 'end', function(){
     console.log();
+
     Object.keys( this_.stats ).filter( function( suiteName ){
       return Object.keys( this_.stats[ suiteName ] ).length > 0;
     }).forEach( function( suiteName ){
       var table = this_.getTable( suiteName );
-
+      var suite = {name: suiteName, duration: 0, tests: 0};
       Object.keys( this_.stats[ suiteName ] ).forEach( function( testName ){
         var test = this_.stats[ suiteName ][ testName ];
+        suite.duration += test.duration;
+        suite.tests++;
         var diff = ( (1 / (test.expected / (test.duration || 0))) -1 ) * 100;
 
         var colorType = 'fast';
@@ -96,7 +108,15 @@ function Perf( runner ){
       });
 
       console.log( table.toString() );
+      suite.ratio = (suite.duration/suite.tests).toFixed()
+      this_.metrics.push(suite);
     });
+    this_.metrics.sort(this_.sortMetrics);
+    var metricsTable = this_.getMetricsTable();
+    this_.metrics.forEach(function (metric){
+      metricsTable.push([metric.name, metric.duration, metric.tests, metric.ratio])
+    })
+    console.log(metricsTable.toString());
   });
 
   runner.on( 'pending', function(){
@@ -104,6 +124,22 @@ function Perf( runner ){
   });
 }
 
+Perf.prototype.sortMetrics = function (a, b){
+  if (parseInt(a.ratio) > parseInt(b.ratio)){
+    return 1;
+  }
+  if (parseInt(a.ratio) < parseInt(b.ratio)){
+    return -1;
+  }
+  return 0;
+};
+Perf.prototype.getMetricsTable = function(){
+  return new Table({
+    head: [ 'Metrics', 'Total', 'Tests', 'Ratio' ].map( color.bind( null, 'header' ) )
+  , colWidths: colWidths
+  , truncate: false
+  });
+};
 Perf.prototype.getTable = function( suiteName ){
   return new Table({
     head: [ suiteName, 'Expected', 'Actual', 'Diff' ].map( color.bind( null, 'header' ) )
